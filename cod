@@ -1,0 +1,13 @@
+class Cart(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.IntegerField()
+
+import stripe
+
+stripe.api_key = "your_stripe_secret_key"
+
+@app.post("/checkout")
+def checkout():
+    # Integração com Stripe
+    pass

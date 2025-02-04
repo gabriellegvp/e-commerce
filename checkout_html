@@ -2,19 +2,41 @@
 
 <script src="https://js.stripe.com/v3/"></script>
 <script>
-    var stripe = Stripe('your_public_key');
-    var checkoutButton = document.getElementById('checkout-button');
+    document.addEventListener('DOMContentLoaded', function () {
+        const stripe = Stripe('your_public_key');
+        const checkoutButton = document.getElementById('checkout-button');
 
-    checkoutButton.addEventListener('click', function () {
-        fetch('/checkout/', {method: 'POST'})
-            .then(function (response) {
-                return response.json();
-            })
-            .then(function (sessionId) {
-                return stripe.redirectToCheckout({ sessionId: sessionId.url });
-            })
-            .catch(function (error) {
-                console.error("Error:", error);
-            });
+        checkoutButton.addEventListener('click', async function () {
+            // Disable the button to prevent multiple clicks
+            checkoutButton.disabled = true;
+            checkoutButton.textContent = 'Processing...';
+
+            try {
+                const response = await fetch('/checkout/', { method: 'POST' });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const session = await response.json();
+
+                if (!session || !session.url) {
+                    throw new Error('Invalid session data');
+                }
+
+                const { error } = await stripe.redirectToCheckout({ sessionId: session.url });
+
+                if (error) {
+                    throw error;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred while processing your request. Please try again.');
+            } finally {
+                // Re-enable the button and reset the text
+                checkoutButton.disabled = false;
+                checkoutButton.textContent = 'Checkout';
+            }
+        });
     });
 </script>

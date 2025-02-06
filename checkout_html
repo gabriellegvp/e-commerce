@@ -3,39 +3,64 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const stripe = Stripe('your_public_key');
+        const stripe = Stripe('your_public_key'); // Substitua pela sua chave pública do Stripe
         const checkoutButton = document.getElementById('checkout-button');
 
-        checkoutButton.addEventListener('click', async function () {
-            // Disable the button to prevent multiple clicks
+        // Função para desabilitar o botão durante o processamento
+        function disableButton() {
             checkoutButton.disabled = true;
             checkoutButton.textContent = 'Processing...';
+        }
+
+        // Função para reativar o botão após o processamento
+        function enableButton() {
+            checkoutButton.disabled = false;
+            checkoutButton.textContent = 'Checkout';
+        }
+
+        // Função para exibir mensagens de erro
+        function showError(message) {
+            alert(message); // Substitua por um modal ou notificação mais amigável, se necessário
+        }
+
+        // Função para criar a sessão de checkout
+        async function createCheckoutSession() {
+            const response = await fetch('/checkout/', { method: 'POST' });
+
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+
+            const session = await response.json();
+
+            if (!session || !session.url) {
+                throw new Error('Invalid session data');
+            }
+
+            return session;
+        }
+
+        // Função para redirecionar ao checkout do Stripe
+        async function redirectToStripeCheckout(session) {
+            const { error } = await stripe.redirectToCheckout({ sessionId: session.url });
+
+            if (error) {
+                throw error;
+            }
+        }
+
+        // Evento de clique no botão de checkout
+        checkoutButton.addEventListener('click', async function () {
+            disableButton(); // Desabilita o botão durante o processamento
 
             try {
-                const response = await fetch('/checkout/', { method: 'POST' });
-
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-
-                const session = await response.json();
-
-                if (!session || !session.url) {
-                    throw new Error('Invalid session data');
-                }
-
-                const { error } = await stripe.redirectToCheckout({ sessionId: session.url });
-
-                if (error) {
-                    throw error;
-                }
+                const session = await createCheckoutSession(); // Cria a sessão de checkout
+                await redirectToStripeCheckout(session); // Redireciona ao Stripe
             } catch (error) {
                 console.error('Error:', error);
-                alert('An error occurred while processing your request. Please try again.');
+                showError('An error occurred while processing your request. Please try again.');
             } finally {
-                // Re-enable the button and reset the text
-                checkoutButton.disabled = false;
-                checkoutButton.textContent = 'Checkout';
+                enableButton(); // Reabilita o botão após o processamento
             }
         });
     });

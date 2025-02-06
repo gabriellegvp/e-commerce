@@ -6,6 +6,11 @@ from django.core.exceptions import ValidationError
 from .models import Product, Cart, Order
 import stripe
 import os
+import logging
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Configuração da chave secreta Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -24,6 +29,12 @@ def add_to_cart(request):
 
             product = get_object_or_404(Product, id=product_id)
 
+            if not product.is_active:
+                raise ValidationError("Product is not active.")
+
+            if quantity > product.stock:
+                raise ValidationError(f"Only {product.stock} units of {product.name} are available.")
+
             cart_item, created = Cart.objects.get_or_create(
                 user=request.user, product=product,
                 defaults={'quantity': quantity}
@@ -36,8 +47,10 @@ def add_to_cart(request):
             return JsonResponse({"message": "Item added to cart."})
 
         except ValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=400)
         except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
 # Visualizar carrinho
@@ -57,6 +70,7 @@ def remove_from_cart(request, item_id):
             cart_item.delete()
             return JsonResponse({"message": "Item removed from cart."})
         except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
 # Processar pagamento via Stripe
@@ -73,8 +87,10 @@ def checkout(request):
             return JsonResponse({"url": checkout_session.url})
 
         except ValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=400)
         except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
             return JsonResponse({"error": str(e)}, status=500)
 
 # Função auxiliar para criar sessão de pagamento no Stripe

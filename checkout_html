@@ -1,67 +1,129 @@
-<button id="checkout-button">Checkout</button>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Checkout</title>
+    <link rel="stylesheet" href="styles.css"> <!-- Adicione um arquivo CSS para estilização -->
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Checkout</h1>
+        <form id="checkout-form">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="items">Items:</label>
+                <select id="items" name="items" multiple required>
+                    <option value="item1">Item 1 - $10.00</option>
+                    <option value="item2">Item 2 - $20.00</option>
+                    <option value="item3">Item 3 - $30.00</option>
+                </select>
+            </div>
+            <button type="submit" id="checkout-button">Checkout</button>
+        </form>
+        <div id="error-message" class="error-message"></div>
+    </div>
 
-<script src="https://js.stripe.com/v3/"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const stripe = Stripe('your_public_key'); // Substitua pela sua chave pública do Stripe
-        const checkoutButton = document.getElementById('checkout-button');
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const stripe = Stripe('your_public_key'); // Substitua pela sua chave pública do Stripe
+            const checkoutButton = document.getElementById('checkout-button');
+            const checkoutForm = document.getElementById('checkout-form');
+            const errorMessage = document.getElementById('error-message');
 
-        // Função para desabilitar o botão durante o processamento
-        function disableButton() {
-            checkoutButton.disabled = true;
-            checkoutButton.textContent = 'Processing...';
-        }
-
-        // Função para reativar o botão após o processamento
-        function enableButton() {
-            checkoutButton.disabled = false;
-            checkoutButton.textContent = 'Checkout';
-        }
-
-        // Função para exibir mensagens de erro
-        function showError(message) {
-            alert(message); // Substitua por um modal ou notificação mais amigável, se necessário
-        }
-
-        // Função para criar a sessão de checkout
-        async function createCheckoutSession() {
-            const response = await fetch('/checkout/', { method: 'POST' });
-
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
+            // Função para desabilitar o botão durante o processamento
+            function disableButton() {
+                checkoutButton.disabled = true;
+                checkoutButton.textContent = 'Processing...';
             }
 
-            const session = await response.json();
-
-            if (!session || !session.url) {
-                throw new Error('Invalid session data');
+            // Função para reativar o botão após o processamento
+            function enableButton() {
+                checkoutButton.disabled = false;
+                checkoutButton.textContent = 'Checkout';
             }
 
-            return session;
-        }
-
-        // Função para redirecionar ao checkout do Stripe
-        async function redirectToStripeCheckout(session) {
-            const { error } = await stripe.redirectToCheckout({ sessionId: session.url });
-
-            if (error) {
-                throw error;
+            // Função para exibir mensagens de erro
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
             }
-        }
 
-        // Evento de clique no botão de checkout
-        checkoutButton.addEventListener('click', async function () {
-            disableButton(); // Desabilita o botão durante o processamento
-
-            try {
-                const session = await createCheckoutSession(); // Cria a sessão de checkout
-                await redirectToStripeCheckout(session); // Redireciona ao Stripe
-            } catch (error) {
-                console.error('Error:', error);
-                showError('An error occurred while processing your request. Please try again.');
-            } finally {
-                enableButton(); // Reabilita o botão após o processamento
+            // Função para ocultar mensagens de erro
+            function hideError() {
+                errorMessage.textContent = '';
+                errorMessage.style.display = 'none';
             }
+
+            // Função para criar a sessão de checkout
+            async function createCheckoutSession(items) {
+                const response = await fetch('/checkout/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ items }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const session = await response.json();
+
+                if (!session || !session.url) {
+                    throw new Error('Invalid session data');
+                }
+
+                return session;
+            }
+
+            // Função para redirecionar ao checkout do Stripe
+            async function redirectToStripeCheckout(session) {
+                const { error } = await stripe.redirectToCheckout({ sessionId: session.url });
+
+                if (error) {
+                    throw error;
+                }
+            }
+
+            // Evento de envio do formulário
+            checkoutForm.addEventListener('submit', async function (event) {
+                event.preventDefault(); // Impede o envio padrão do formulário
+
+                disableButton(); // Desabilita o botão durante o processamento
+                hideError(); // Oculta mensagens de erro anteriores
+
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+                const items = Array.from(document.getElementById('items').selectedOptions)
+                    .map(option => option.value);
+
+                if (!name || !email || items.length === 0) {
+                    showError('Please fill out all fields and select at least one item.');
+                    enableButton();
+                    return;
+                }
+
+                try {
+                    const session = await createCheckoutSession(items); // Cria a sessão de checkout
+                    await redirectToStripeCheckout(session); // Redireciona ao Stripe
+                } catch (error) {
+                    console.error('Error:', error);
+                    showError('An error occurred while processing your request. Please try again.');
+                } finally {
+                    enableButton(); // Reabilita o botão após o processamento
+                }
+            });
         });
-    });
-</script>
+    </script>
+</body>
+</html>
